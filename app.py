@@ -27,7 +27,8 @@ async def download_audio(request: DownloadRequest):
             'preferredcodec': 'mp3',
             'preferredquality': '320',
         }],
-        'outtmpl': '%(title)s.%(ext)s'  # Save with video title as filename
+        'outtmpl': '%(title)s.%(ext)s',  # Save with video title as filename
+        'cookiesfrombrowser': ('chrome',),  # Use cookies from Chrome browser
     }
     with YoutubeDL(ydl_opts) as ydl:
         try:
