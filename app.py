@@ -1,7 +1,8 @@
-from fastapi import FastAPI
-from yt_dlp import YoutubeDL
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pytube import YouTube
+import os
 
 app = FastAPI()
 
@@ -14,32 +15,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Define request model
 class DownloadRequest(BaseModel):
     url: str
 
 @app.post("/download")
 async def download_audio(request: DownloadRequest):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '320',
-        }],
-        'outtmpl': '%(title)s.%(ext)s',  # Save with video title as filename
-        'cookiesfrombrowser': ('chrome',),  # Use cookies from Chrome browser
-    }
-    with YoutubeDL(ydl_opts) as ydl:
-        try:
-            info = ydl.extract_info(request.url, download=True)
-            return {
-                "title": info.get('title'),
-                "duration": info.get('duration'),
-                "filename": f"{info.get('title')}.mp3"
-            }
-        except Exception as e:
-            return {"error": str(e)}
+    try:
+        # Create YouTube object
+        yt = YouTube(request.url)
+        
+        # Get audio stream
+        audio = yt.streams.filter(only_audio=True).first()
+        
+        # Download
+        out_file = audio.download()
+        
+        # Rename to mp3
+        base, ext = os.path.splitext(out_file)
+        new_file = base + '.mp3'
+        os.rename(out_file, new_file)
+        
+        return {
+            "title": yt.title,
+            "duration": yt.length,
+            "filename": os.path.basename(new_file)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/")
 async def read_root():
